@@ -2,64 +2,50 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PostRequest;
 use App\Models\Post;
 use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function store(PostRequest $request)
     {
-        //
+        $post = $request->user()->posts()->create($request->validated());
+        $fileAdders = $post->addMultipleMediaFromRequest(['images'])
+            ->each(function ($fileAdder) use ($request) {
+                $fileAdder->toMediaCollection('u'.$request->user()->id);
+            });
+
+        return redirect()->back();
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function like(Post $post)
     {
-        //
+        $post->likes()->toggle(auth()->user());
+
+        return response()->json([
+            'liked' => auth()->user()->likedPosts->contains($post),
+            'likes_count' => $post->likes()->count(),
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function save(Post $post)
     {
-        //
+        $post->saves()->toggle(auth()->user());
+
+        return response()->json([
+            'saved' => auth()->user()->savedPosts->contains($post),
+            'saves_count' => $post->saves()->count(),
+        ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Post $post)
+    public function comment(Post $post, Request $request)
     {
-        //
-    }
+        $data = $request->validate([
+            'body' => ['required', 'string', 'max:280'],
+        ]);
+        $data['user_id'] = auth()->id();
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Post $post)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Post $post)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Post $post)
-    {
-        //
+        $post->comments()->create($data);
     }
 }
